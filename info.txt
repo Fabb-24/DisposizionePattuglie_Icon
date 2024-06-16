@@ -1,0 +1,33 @@
+IDEA: dato in input il numero di pattuglie disponibili in tutta chicago, stabilire la migliore disposizione di queste pattuglie nelle varia zone di chicago in base a una previsione della gravità dei crimini in una determinata fascia oraria di un determinato giorno
+
+
+- DATASET UTILIZZATI:
+	- dataset dei crimini di chicago del 2020 (per ogni crimine si ha data, ora, tipo di crimine, coordinate, ...)
+	- elenco delle zone/quartieri di chicago (per ogni quartiere si ha nome, confini rappresentati come punti di poligono, ...)
+
+
+- SISTEMAZIONE DEI DATASET:
+Per quanto riguarda il secondo dataset, non ci sono colonne da modificare, ma verranno eliminate tutte le colonne tranne: the_geom (che rappresenta il confine dell'area come elenco dei punti che formano il poligono dell'area), nome_area, num_area.
+Per quanto riguarda il primo dataset, occorre associare a ogni tipo di crimine presente nel dataset un livello di gravità del crimine (per esempio: basso, medio, alto). La data, nel formato GG/MM/AAAA HH:MM:SS, viene suddivisa nelle colonne: num settimana, giorno della settimana e fascia oraria, tralasciando le informazioni relative all'anno e al mese. Infine dal dataset vengono eliminate tutte le colonne tranne: num_settimana, giorno, fascia_oraria, codice_area, gravità_crimine. Per un utilizzo migliore del dataset vengono eliminate le righe che hanno valori nulli in una o piu colonne.
+
+
+- APPRENDIMENTO SUPERVISIONATO
+Tramite modelli di apprendimento supervisionato viene predetta la gravità del crimine. Si utilizzano quindi come feature di input: num_settimana, giorno, fascia oraria e codice area. La feature di output sarà quindi la gravità del crimine. Si tratta quindi di un task di classificazione. Verranno usati più modelli di classificazione che verrano poi messi a confronto per determinare il migliore da utilizzare.
+
+
+- PROLOG
+Con il linguaggio prolog verranno creati fatti e regole utili per la ricerca della disposizione delle pattuglie. In particolare verrà creato un fatto "crimine" che avrà come attributi: settimana, giorno, ora, zona e livello (predetto con l'apprendimento). Poi verrà definito un fatto "vicinanza" che avrà come argomenti 2 zone. Il fatto sarà presente per le zone che si toccano fisicamente.
+Una regola sarà "pattuglia_presente" che avrà come argomento una zona e sarà vera se la zona è soggetta a pattuglia in base alla gravità del crimine predetto: in particolare, una zona con criminalità alta deve avere la pattuglia al suo interno, una con criminalità media deve avere una pattuglia a distanza di massimo 2 zone. Verrà quindi definito un fatto dinamico (che cambia nel corso dell'esecuzione del programma) che rappresenterà la presenza della pattuglia in una zona.
+
+
+- CSP (Constraint Satisfaction Problem)
+Tramite un csp verrà cercata la miglior disposizione delle pattuglie (il cui massimo numero disponibile verrà indicato in input) nelle zone, assegnando ciascuna pattuglia in una zona. I vincoli saranno quelli definiti in prolog tramite la regola "pattuglia_presente".
+
+
+- MIGLIORAMENTI POSSIBILI
+Aggiunta di vincoli ulteriori nel calcolo della disposizione delle pattuglie. Per esempio si potrebbe aggiungere un vincolo derivante dal tipo di pattuglie disponibili (indicato in input): pattuglie a piedi o in auto. In questo caso converrebbe sistemare diversamente il dataset, magari non eliminando la colonna "Arrest" che diventerebbe una feature target. Una possibile regola in questo caso è che se l'area è soggetta ad arresto, la pattuglia che la copre deve essere in auto. Si avrebbe quindi anche una conseguente modifica di fatti e regole in prolog.
+
+
+
+-------------------- APPUNTI ------------------
+- Ricercare le modalità della valutazione dei rischi delle zone.
