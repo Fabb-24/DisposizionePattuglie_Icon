@@ -10,6 +10,7 @@ from imblearn.over_sampling import SMOTE
 import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
+import json
 
 
 '''
@@ -88,7 +89,7 @@ class SupervisedLearning:
     Effettua l'oversampling del dataset, divide il dataset in training e test set, cerca i migliori parametri per i modelli e addestra i modelli tramite k-fold cross-validation.
     I modelli addestrati vengono salvati su file.
     '''
-    def trainModel(self):
+    def trainModel(self, bestParamsFile=None):
         # Oversampling del dataset
         dataset = self.oversamplimg(self.dataset, self.target)
 
@@ -97,8 +98,16 @@ class SupervisedLearning:
         y = dataset[self.target]
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-        # Ricerca dei migliori parametri per i modelli
-        best_params = self.bestParams(X_train, y_train)
+        if bestParamsFile is None:
+            # Ricerca dei migliori parametri per i modelli
+            best_params = self.bestParams(X_train, y_train)
+            # Salvataggio dei migliori parametri su file
+            with open('models/best_params.json', 'w') as file:
+                json.dump(best_params, file)
+        else:
+            # Caricamento dei migliori parametri da file
+            with open(bestParamsFile, 'r') as file:
+                best_params = json.load(file)
 
         # Impostazione dei modelli con i migliori parametri
         models = {
@@ -120,7 +129,7 @@ class SupervisedLearning:
                 )
             }
         
-        '''cv = RepeatedKFold(n_splits=5, n_repeats=5)
+        cv = RepeatedKFold(n_splits=5, n_repeats=5)
 
         # Addestramento dei modelli: valutazione e salvataggio su file
         for model_name, model in models.items():
@@ -132,7 +141,7 @@ class SupervisedLearning:
 
             # Valutazione del modello tramite k-fold cross-validation
             for score in self.scoring:
-                scores = cross_val_score(pipeline, X, y, cv=cv, scoring=score)
+                scores = cross_val_score(pipeline, X, y, cv=cv, scoring=score, n_jobs=-1)
                 mean_score = np.mean(scores)
                 print(f"{score}: ", mean_score)
             pipeline.fit(X_train, y_train)
@@ -140,40 +149,54 @@ class SupervisedLearning:
             # Salvataggio del modello su file
             model_filename = f"models/{model_name}_model.pkl"
             joblib.dump(pipeline, model_filename)
-            print(f"Saved {model_name} model to {model_filename}")'''
+            print(f"Saved {model_name} model to {model_filename}")
         
-        self.plot_learning_curves(models['DecisionTree'], X, y, self.target, 'DecisionTree')
-        self.plot_learning_curves(models['RandomForest'], X, y, self.target, 'RandomForest')
-        self.plot_learning_curves(models['LogisticRegression'], X, y, self.target, 'LogisticRegression')
+        # Generazione delle learning curves per i modelli
+        for model_name, model in models.items():
+            print(f"Generating {model_name} learning curve...")
+            self.learningCurve(model, X, y, model_name)
 
     
-    def plot_learning_curves(self, model, X, y, differentialColumn, model_name):
-        train_sizes, train_scores, test_scores = learning_curve(model, X, y, cv=10, scoring='accuracy')
+    '''
+    Funzione che genera la learning curve per un modello.
+    Genera la learning curve per il modello passato come parametro e salva il grafico su file.
+    Il grafico mostra l'andamento dell'accuracy del modello in funzione del numero di esempi di training.
+    Parametri:
+    - model (Model): il modello per cui generare la learning curve
+    - X (DataFrame): il dataset senza il target
+    - y (DataFrame): il target del dataset
+    - model_name (String): il nome del modello
+    '''
+    def learningCurve(self, model, X, y, model_name):
+        # Generazione della learning curve
+        train_sizes, train_scores, test_scores = learning_curve(
+            estimator=model,
+            X=X,
+            y=y,
+            cv=5,
+            n_jobs=-1,
+            train_sizes=np.linspace(0.1, 1.0, 10),
+            scoring='accuracy'
+        )
 
-        # Calcola gli errori su addestramento e test
-        train_errors = 1 - train_scores
-        test_errors = 1 - test_scores
+        # Calcolo delle medie e delle deviazioni standard dei punteggi di training e test
+        train_scores_mean = np.mean(train_scores, axis=1)
+        train_scores_std = np.std(train_scores, axis=1)
+        test_scores_mean = np.mean(test_scores, axis=1)
+        test_scores_std = np.std(test_scores, axis=1)
 
-        # Calcola la deviazione standard e la varianza degli errori su addestramento e test
-        train_errors_std = np.std(train_errors, axis=1)
-        test_errors_std = np.std(test_errors, axis=1)
-        train_errors_var = np.var(train_errors, axis=1)
-        test_errors_var = np.var(test_errors, axis=1)
-
-        # Stampa i valori numerici della deviazione standard e della varianza
-        print(
-            f"\033[95m{model_name} - Train Error Std: {train_errors_std[-1]}, Test Error Std: {test_errors_std[-1]}, Train Error Var: {train_errors_var[-1]}, Test Error Var: {test_errors_var[-1]}\033[0m")
-
-        # Calcola gli errori medi su addestramento e test
-        mean_train_errors = 1 - np.mean(train_scores, axis=1)
-        mean_test_errors = 1 - np.mean(test_scores, axis=1)
-
-        #Visualizza la curva di apprendimento
-        plt.figure(figsize=(16, 10))
-        plt.plot(train_sizes, mean_train_errors, label='Errore di training', color='green')
-        plt.plot(train_sizes, mean_test_errors, label='Errore di testing', color='red')
-        plt.title(f'Curva di apprendimento per {model_name}')
-        plt.xlabel('Dimensione del training set')
-        plt.ylabel('Errore')
-        plt.legend()
-        plt.show()
+        # Creazione del grafico della learning curve
+        plt.figure()
+        plt.title(f"Learning Curve for {model_name}")
+        plt.xlabel("Training examples")
+        plt.ylabel("Score")
+        plt.ylim((0.0, 1.1))
+        plt.grid()
+        plt.fill_between(train_sizes, train_scores_mean - train_scores_std, train_scores_mean + train_scores_std, alpha=0.1, color="r", label="Training score")
+        plt.fill_between(train_sizes, test_scores_mean - test_scores_std, test_scores_mean + test_scores_std, alpha=0.1, color="g", label="Test score")
+        plt.plot(train_sizes, train_scores_mean, 'o-', color="red", label="Training score")
+        plt.plot(train_sizes, test_scores_mean, 'o-', color="green", label="Cross-validation score")
+        plt.legend(loc="best")
+        # Salvataggio del grafico
+        plt.savefig(f"learningCurves/{model_name}_learningCurve.png")
+        plt.close()

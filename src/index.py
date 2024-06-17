@@ -26,10 +26,10 @@ if __name__ == "__main__":
 
     # Apprendimento supervisionato per la previsione della gravità dei crimini
     supervisedLearning = SupervisedLearning(chicagoCrimesDf, "Severity")
-    supervisedLearning.trainModel()
+    supervisedLearning.trainModel("models/best_params.json")
 
     '''# Creazione della knowledge base
-    prolog = KB(chicagoAreasDf, "RandomForest", 26, 3, 2)
+    prolog = KB(chicagoAreasDf, "DecisionTree", 26, 3, 2)
 
     # Risoluzione del problema di CSP
     csp = CSP(prolog, 150)
