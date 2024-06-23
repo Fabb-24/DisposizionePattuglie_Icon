@@ -2,7 +2,8 @@ from pyswip import Prolog
 from shapely.geometry import MultiPolygon
 import pandas as pd
 import joblib
-from util import removeDuplicates
+from util import removeDuplicates, getBasePath
+import os
 
 '''
 Classe che rappresenta la base di conoscenza in prolog e fornisce i metodi per manipolarla e interrogarla
@@ -12,15 +13,15 @@ class KB:
     Costruttore della classe. Inizializza la base di conoscenza in prolog
     Parametri:
     - areasGdf (GeoDataFrame): un GeoDataFrame contenente le aree di Chicago con il loro perimetro
-    - modelName (String): il nome del modello di machine learning da utilizzare per la previsione della gravità dei crimini (RandomForest, DecisionTree, LogisticRegression)
+    - modelPath (String): Il percorso del modello di machine learning addestrato per la previsione della gravità dei crimini
     - week (Int): la settimana in cui si vuole effettuare la previsione
     - day (Int): il giorno della settimana in cui si vuole effettuare la previsione
     - timeslot (int): la fascia oraria in cui si vuole effettuare la previsione
     '''
-    def __init__(self, areasGdf, modelName, week, day, timeslot):
+    def __init__(self, areasGdf, modelPath, week, day, timeslot):
         self.prolog = Prolog()
         self.areasGdf = areasGdf
-        self.modelName = modelName
+        self.modelPath = modelPath
         self.week = week
         self.day = day
         self.timeslot = timeslot
@@ -31,20 +32,14 @@ class KB:
     Metodo che inizializza la base di conoscenza in prolog
     '''
     def initializaKB(self):
-        # Definizione del fatto patrolArea per la zona 78 (inesistente) per evitare errori di esistenza in caso di query
-        self.prolog.assertz("patrolArea(78)")
+        kb = str(os.path.join(getBasePath(), "src", "kb.pl")).replace("\\", "/")
+        self.prolog.consult(kb)
         # Definizione dei fatti nearAreas per le aree vicine
         self.defineNearAreas()
-        # Definizione delle regole relative alla gravità delle aree
-        self.defineAreaSeverityRules()
-        # Definizione delle regole relative alla distanza tra le aree (distanza 1 e 2)
-        self.prolog.assertz("distance(X, Y, D) :- nearAreas(X, Y), D is 1")
-        self.prolog.assertz("distance(X, Y, D) :- nearAreas(X, Y), D is 2")
-        self.prolog.assertz("distance(X, Y, D) :- nearAreas(X, Z), nearAreas(Z, Y), D is 2, X \= Y, \+ nearAreas(X, Y)")
-        # Definizione delle regole relative alla sicurezza delle aree
-        self.prolog.assertz("secureArea(X) :- patrolArea(X)")
-        self.prolog.assertz("secureArea(X) :- areaSeverity(X, D), D is 1, distance(X, Y, 1), patrolArea(Y)")
-        self.prolog.assertz("secureArea(X) :- areaSeverity(X, D), D is 0, distance(X, Y, 2), patrolArea(Y)")
+        # Definizione dei fatti relativi alla gravità delle aree
+        self.defineAreaSeverities()
+        # Definizione dei fatti relativi alle dimensioni delle aree
+        self.defineAreasSize()
 
 
     '''
@@ -57,12 +52,15 @@ class KB:
         for area1 in self.areasGdf.itertuples():
             perimeter1 = MultiPolygon(area1.Perimeter)
             y = 0
+            list = []
             for area2 in self.areasGdf.itertuples():
                 if i != y:
                     perimeter2 = MultiPolygon(area2.Perimeter)
                     if perimeter1.touches(perimeter2):
-                        self.prolog.assertz(f"nearAreas({area1.AreaNumber}, {area2.AreaNumber})")
+                        list.append(area2.AreaNumber)
                 y += 1
+            self.prolog.assertz(f"area({area1.AreaNumber})")
+            self.prolog.assertz(f"nearAreas(area({area1.AreaNumber}), {list})")
             i += 1
     
 
@@ -70,9 +68,9 @@ class KB:
     Metodo che definisce i fatti areaSeverity per le aree di Chicago, della forma areaSeverity(AreaNumber, Severity).
     La gravità dei crimini è prevista utilizzando il modello di machine learning addestrato
     '''
-    def defineAreaSeverityRules(self):
-        modelFile = f"models/{self.modelName}_model.pkl"
-        loadedModel = joblib.load(modelFile)
+    def defineAreaSeverities(self):
+        #modelFile = f"models/{self.modelName}_model.pkl"
+        loadedModel = joblib.load(self.modelPath)
 
         for area in self.areasGdf.itertuples():
             data = {
@@ -82,7 +80,16 @@ class KB:
                 'Community Area': area.AreaNumber
             }
             prediction = loadedModel.predict(pd.DataFrame(data, index=[0]))
-            self.prolog.assertz(f"areaSeverity({area.AreaNumber}, {int(prediction[0])})")
+            self.prolog.assertz(f"severity(area({area.AreaNumber}), {int(prediction[0])})")
+
+    
+    '''
+    Metodo che definisce i fatti size per le aree di Chicago, della forma size(area(AreaNumber), AreaSize).
+    Rappresentano le aree delle zone di Chicago
+    '''
+    def defineAreasSize(self):
+        for area in self.areasGdf.itertuples():
+            self.prolog.assertz(f"size(area({area.AreaNumber}), {area.AreaSize})")
 
 
     '''
@@ -90,8 +97,13 @@ class KB:
     Parametri:
     - areaNum (Int): il numero dell'area da impostare come pattugliata
     '''
-    def setAreaPatrol(self, areaNum):
-        self.prolog.assertz(f"patrolArea({areaNum})")
+    def setAreaPatrol(self, areaNum, patrol):
+        # controllo se esiste già un fatto patrolArea per l'area specificata
+        res = list(self.prolog.query(f"patrolArea(area({areaNum}), _)"))
+        if res:
+            self.prolog.retract(f"patrolArea(area({areaNum}), _)")
+        self.prolog.assertz(f"patrolArea(area({areaNum}), {'true' if patrol else 'false'})")
+
     
 
     '''
@@ -100,17 +112,8 @@ class KB:
     - areaNum (Int): il numero dell'area da rimuovere dalla lista delle aree pattugliate
     '''
     def removeAreaPatrol(self, areaNum):
-        if self.isAreaPatrolled(areaNum) > 0:
-            self.prolog.retract(f"patrolArea({areaNum})")
-    
-
-    '''
-    Metodo che verifica se l'area specificata è pattugliata
-    Parametri:
-    - areaNum (Int): il numero dell'area da verificare
-    '''
-    def isAreaPatrolled(self, areaNum):
-        return len(list(self.prolog.query(f"patrolArea({areaNum})"))) > 0
+        if list(self.prolog.query(f"patrolArea(area({areaNum}), _)")):
+            self.prolog.retract(f"patrolArea(area({areaNum}), _)")
 
 
     '''
@@ -118,11 +121,9 @@ class KB:
     Parametri:
     - areaNum (Int): il numero dell'area da verificare
     '''
-    def isAreaSecure(self, areaNum):
-        res = list(self.prolog.query(f"secureArea({areaNum})"))
-        if res == []:
-            return False
-        return True
+    def isAreaSafe(self, areaNum):
+        res = list(self.prolog.query(f"isSafe(area({areaNum}))"))
+        return res
     
 
     '''
@@ -130,20 +131,8 @@ class KB:
     '''
     def getAreasList(self):
         areasList = []
-        for area in self.areasGdf.itertuples():
-            areasList.append(area.AreaNumber)
-        return areasList
-    
-
-    '''
-    Metodo che restituisce la lista delle aree di Chicago con la gravità specificata
-    Parametri:
-    - gravity (Int): la gravità dei crimini
-    '''
-    def getAreasByGravity(self, gravity):
-        areas = list(self.prolog.query(f"areaSeverity(X, {gravity})"))
-        areasList = []
-        for area in areas:
+        res = list(self.prolog.query("area(X)"))
+        for area in res:
             areasList.append(area['X'])
         return areasList
     
@@ -155,7 +144,7 @@ class KB:
     - distance (Int): la distanza dall'area di partenza
     '''
     def getAreasByDistance(self, areaNum, distance):
-        areas = list(self.prolog.query(f"distance({areaNum}, X, {distance})"))
+        areas = list(self.prolog.query(f"distance(area({areaNum}), area(X), {distance})"))
         areasList = []
         for area in areas:
             areasList.append(area['X'])
@@ -167,6 +156,20 @@ class KB:
     Parametri:
     - areaNum (Int): il numero dell'area
     '''
-    def getAreaGravity(self, areaNum):
-        severity = list(self.prolog.query(f"areaSeverity({areaNum}, X)"))
+    def getAreaSeverity(self, areaNum):
+        severity = list(self.prolog.query(f"severity(area({areaNum}), X)"))
         return severity[0]['X']
+    
+
+    '''
+    Funzione che restituisce la lista delle aree valutabili
+    Parametri:
+    - areas (List): la lista delle aree da cui selezionare le aree valutabili
+    '''
+    def evaluableAreas(self, areas):
+        evAreas = list(self.prolog.query("isConsiderable(area(X))"))
+        areasList = []
+        for evArea in evAreas:
+            if evArea['X'] in areas:
+                areasList.append(evArea['X'])
+        return areasList

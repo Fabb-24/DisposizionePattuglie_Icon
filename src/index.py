@@ -1,37 +1,26 @@
-from clearDataset import clearChicagoAreas, clearChicagoCrimes
+from cleanDataset import cleanChicagoAreas, cleanChicagoCrimes
 from PrologKB import KB
-from csp import CSP
-from supervisedLearning import SupervisedLearning
-
-
-'''
-Metodo che stampa la soluzione del problema di CSP. Se la soluzione è None, stampa "No solution found", altrimenti stampa le aree da pattugliare
-Parametri:
-- sol (Dict): la soluzione del problema di CSP
-'''
-def printSolution(sol):
-    if sol is None:
-        print("No solution found")
-    else:
-        print("Areas to patrol:", end=" ")
-        for key in sol:
-            if sol[key]:
-                print(key, end=" ")
+from patrolArrangement import PatrolArrangement as PA
+from icon.learning import SupervisedLearning as SL
+from util import printSolution, getBasePath
+import os
 
 
 if __name__ == "__main__":
     # Pulizia dei dataset
-    chicagoAreasDf = clearChicagoAreas()
-    chicagoCrimesDf = clearChicagoCrimes()
+    chicagoAreasDf = cleanChicagoAreas()
+    chicagoCrimesDf = cleanChicagoCrimes()
 
     # Apprendimento supervisionato per la previsione della gravità dei crimini
-    supervisedLearning = SupervisedLearning(chicagoCrimesDf, "Severity")
-    supervisedLearning.trainModel("models/best_params.json")
+    #supervisedLearning = SL(chicagoCrimesDf, "Severity")
+    # Se come parametro si passa il json con i parametri verrano usati invece che cercati
+    #res = supervisedLearning.trainModel(os.path.join(getBasePath(), "learning"))
+    #print(res)
+    
 
-    '''# Creazione della knowledge base
-    prolog = KB(chicagoAreasDf, "DecisionTree", 26, 3, 2)
+    # Creazione della knowledge base
+    kb = KB(chicagoAreasDf, os.path.join(getBasePath(), "learning", "models", "DecisionTree.pkl"), 32, 2, 1)
 
-    # Risoluzione del problema di CSP
-    csp = CSP(prolog, 150)
-    sol = csp.solve()
-    printSolution(sol)'''
+    pa = PA(kb)
+    sol = pa.findBestArrangement()
+    printSolution(sol)
