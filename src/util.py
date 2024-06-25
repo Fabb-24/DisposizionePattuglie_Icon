@@ -47,6 +47,22 @@ def printSolution(sol):
                 print(key, end=" ")
 
 
+def printResults(results):
+    """
+    Metodo che stampa i risultati dell'apprendimento supervisionato
+
+    Parametri:
+        results (Dict): i risultati dell'apprendimento supervisionato
+    """
+
+    print("\n\nRisultati dell'apprendimento supervisionato\n")
+    for key in results:
+        print(f"Modello: {key}")
+        for k in results[key]:
+            print(f"\t{k}: {results[key][k]}")
+        print("\n")
+
+
 def getBasePath():
     """
     Metodo che ritorna il path base del progetto

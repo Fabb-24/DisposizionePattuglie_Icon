@@ -5,10 +5,14 @@ import os
 from util import getBasePath
 
 
-'''
-Funzione che restituisce le aree di Chicago che verranno utilizzate
-'''
 def getChicagoAreas():
+    """
+    Funzione che restituisce le aree di Chicago che verranno utilizzate
+
+    Returns:
+        list: lista delle aree di Chicago
+    """
+
     areas = [5, 6, 7, 21, 22, #north side
             15, 16, 17, 18, 19, 20, #northwest side
             8, 32, 33, #central
@@ -18,10 +22,14 @@ def getChicagoAreas():
     return areas
 
 
-'''
-Funzione che sistema il dataset che contiene le aree di Chicago e lo restituisce
-'''
 def cleanChicagoAreas():
+    """
+    Funzione che sistema il dataset che contiene le aree di Chicago e lo restituisce
+
+    Returns:
+        GeoDataFrame: dataset delle aree di Chicago
+    """
+
     dfPath = os.path.join(getBasePath(), "dataset", "chicagoAreas.csv")
     # Lettura del dataset
     df = pd.read_csv(dfPath)
@@ -41,13 +49,21 @@ def cleanChicagoAreas():
     return gdf
 
 
-'''
-Funzione che divide i tipi di crimine in base alla loro gravità
-'''
 def divideCrimeType():
+    """
+    Funzione che divide i tipi di crimine in base alla loro gravità
+
+    Returns:
+        dict: dizionario che mappa i tipi di crimine con la loro gravità
+    """
+
     high_severity = ['homicide', 'kidnapping', 'criminal sexual assault', 'arson', 'robbery', 'sex offense', 'human trafficking']
-    medium_severity = ['theft', 'assault', 'battery', 'burglary', 'weapons violation', 'narcotics', 'motor vehicle theft', 'criminal damage', 'offense involving children', 'prostitution', 'stalking', 'crim sexual assault']
-    low_severity = ['theft', 'other offense', 'deceptive practice', 'criminal trespass', 'interference with public officer', 'public peace violation', 'gambling', 'intimidation', 'obscenity', 'non-criminal', 'liquor law violation', 'public indecency', 'ritualism', 'other narcotic violation', 'concealed carry license violation']
+    medium_severity = ['theft', 'assault', 'battery', 'burglary', 'weapons violation', 'narcotics', 'motor vehicle theft',
+                        'criminal damage', 'offense involving children', 'prostitution', 'stalking', 'crim sexual assault']
+    low_severity = ['theft', 'other offense', 'deceptive practice', 'criminal trespass', 'interference with public officer',
+                        'public peace violation', 'gambling', 'intimidation', 'obscenity', 'non-criminal', 'liquor law violation',
+                        'public indecency', 'ritualism', 'other narcotic violation', 'concealed carry license violation']
+    
     # Mappatura dei tipi di crimine con la loro gravità (0 = bassa, 1 = media, 2 = alta)
     crimeSeverity = {}
     for crime in high_severity:
@@ -60,10 +76,14 @@ def divideCrimeType():
     return crimeSeverity
 
 
-'''
-Funzione che sistema il dataset che contiene i crimini di Chicago e lo restituisce
-'''
 def cleanChicagoCrimes():
+    """
+    Funzione che sistema il dataset che contiene i crimini di Chicago e lo restituisce
+
+    Returns:
+        DataFrame: dataset dei crimini di Chicago
+    """
+
     dfPath = os.path.join(getBasePath(), "dataset", "chicagoCrimes2018.csv")
     # Lettura del dataset
     df = pd.read_csv(dfPath)
@@ -78,9 +98,6 @@ def cleanChicagoCrimes():
     df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y %I:%M:%S %p')
     df['Week'] = df['Date'].dt.isocalendar().week
     df['Day'] = df['Date'].dt.dayofweek
-    #df['Time Slot'] = df['Date'].dt.hour
-    #divisione in fasce orarie nel formato HHmm dove mm è 00 o 30
-    #df['Time Slot'] = df['Date'].dt.hour * 100 + (df['Date'].dt.minute // 30) * 30
     df['Time Slot'] = df['Date'].dt.hour
     df.drop(columns=['Date'], inplace=True)
     # Conversione della colonna Week in intero

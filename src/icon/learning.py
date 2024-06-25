@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.discriminant_analysis import StandardScaler
-from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, RepeatedKFold, cross_val_score, learning_curve, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
@@ -42,15 +42,25 @@ class SupervisedLearning:
         self.empty_models = {
             'Decision Tree': DecisionTreeClassifier(),
             'Random Forest': RandomForestClassifier(),
-            'Logistic Regression': LogisticRegression(),
-            'K-Nearest Neighbors': KNeighborsClassifier(),
+            'AdaBoost': AdaBoostClassifier(),
         }
 
         self.param_grids = {
-            'Decision Tree': {'criterion': ['gini', 'entropy'], 'max_depth': [10, 20, 30, 40], 'min_samples_split': [2, 5, 10, 20], 'min_samples_leaf': [1, 2, 5, 10]},
-            'Random Forest': {'criterion': ['gini', 'entropy'], 'n_estimators': [100, 200], 'max_depth': [10, 20], 'min_samples_split': [2, 5, 10], 'min_samples_leaf': [1, 2, 5], 'bootstrap': [True, False]},
-            'Logistic Regression': {'C': [0.01, 0.1, 1, 10], 'max_iter': [500, 1000, 2000], 'solver': ['liblinear'], 'penalty': ['l2']},
-            'K-Nearest Neighbors': {'n_neighbors': [3, 5, 7, 9], 'weights': ['uniform', 'distance'], 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute']}
+            'Decision Tree': {'criterion': ['gini', 'entropy'],
+                            'max_depth': [10, 20, 30, 40],
+                            'min_samples_split': [2, 5, 10, 20],
+                            'min_samples_leaf': [1, 2, 5, 10]},
+
+            'Random Forest': {'criterion': ['gini', 'entropy'],
+                            'n_estimators': [100, 200],
+                            'max_depth': [10, 20],
+                            'min_samples_split': [2, 5, 10],
+                            'min_samples_leaf': [1, 2, 5],
+                            'bootstrap': [True, False]},
+                            
+            'AdaBoost': {'n_estimators': [50, 100, 200],
+                        'learning_rate': [0.01, 0.1, 1, 10],
+                        'algorithm': ['SAMME']}
         }
 
         self.preprocessor = ColumnTransformer(
@@ -119,20 +129,14 @@ class SupervisedLearning:
                     bootstrap=best_params['Random Forest']['bootstrap'],
                     criterion=best_params['Random Forest']['criterion']
                 ),
-                'LogisticRegression': LogisticRegression(
-                    C=best_params['Logistic Regression']['C'],
-                    max_iter=best_params['Logistic Regression']['max_iter'],
-                    solver=best_params['Logistic Regression']['solver'],
-                    penalty=best_params['Logistic Regression']['penalty']
-                ),
-                'K-Nearest Neighbors': KNeighborsClassifier(
-                    n_neighbors=best_params['K-Nearest Neighbors']['n_neighbors'],
-                    weights=best_params['K-Nearest Neighbors']['weights'],
-                    algorithm=best_params['K-Nearest Neighbors']['algorithm']
+                'AdaBoost': AdaBoostClassifier(
+                    n_estimators=best_params['AdaBoost']['n_estimators'],
+                    learning_rate=best_params['AdaBoost']['learning_rate'],
+                    algorithm=best_params['AdaBoost']['algorithm']
                 )
             }
         
-        cv = RepeatedKFold(n_splits=10, n_repeats=5)
+        cv = RepeatedKFold(n_splits=5, n_repeats=5)
 
         res = {}
 
@@ -146,7 +150,7 @@ class SupervisedLearning:
                 ('model', model)
             ])
 
-            # Valutazione del modello tramite k-fold cross-validation
+            # Addestramento e valutazione del modello tramite k-fold cross-validation
             for score in self.scoring:
                 scores = cross_val_score(pipeline, X, y, cv=cv, scoring=score, n_jobs=-2)
                 mean_score = np.mean(scores)
@@ -168,7 +172,8 @@ class SupervisedLearning:
 
     def bestParams(self, X_train, y_train):
         """
-        Funzione che restituisce i migliori parametri per i modelli. Utilizza la tecnica GridSearchCV per la ricerca dei migliori parametri
+        Funzione che restituisce i migliori parametri per i modelli.
+        Utilizza la tecnica GridSearchCV per la ricerca dei migliori parametri
 
         Parametri:
             X_train (DataFrame): il dataset di training senza il target
@@ -178,7 +183,8 @@ class SupervisedLearning:
         values = {}
         for model_name, model in self.empty_models.items():
             print(f"\nSearching best params for {model_name} model...")
-            grid_search = GridSearchCV(estimator=model, param_grid=self.param_grids[model_name], cv=5, n_jobs=-2, verbose=2, scoring='f1_macro', refit='f1_macro')
+            grid_search = GridSearchCV(estimator=model, param_grid=self.param_grids[model_name],
+                                        cv=5, n_jobs=-1, verbose=2, scoring='f1_macro', refit='f1_macro')
             pipeline = Pipeline([
                 ('preprocessor', self.preprocessor),
                 ('model', grid_search)
@@ -208,7 +214,8 @@ class SupervisedLearning:
 
     def learningCurve(self, model, X, y, model_name, savePath):
         """
-        Funzione che genera la learning curve per il modello passato come parametro. Salva il grafico su file
+        Funzione che genera la learning curve per il modello passato come parametro.
+        Salva il grafico su file
 
         Parametri:
             model (Model): il modello per cui generare la learning curve
@@ -230,9 +237,7 @@ class SupervisedLearning:
 
         # Calcolo delle medie e delle deviazioni standard dei punteggi di training e test
         train_scores_mean = np.mean(train_scores, axis=1)
-        train_scores_std = np.std(train_scores, axis=1)
         test_scores_mean = np.mean(test_scores, axis=1)
-        test_scores_std = np.std(test_scores, axis=1)
 
         # Creazione del grafico della learning curve
         plt.figure()
@@ -242,7 +247,7 @@ class SupervisedLearning:
         plt.ylim((0.0, 1.1))
         plt.grid()
         plt.plot(train_sizes, train_scores_mean, 'o-', color="red", label="Training score")
-        plt.plot(train_sizes, test_scores_mean, 'o-', color="green", label="Cross-validation score")
+        plt.plot(train_sizes, test_scores_mean, 'o-', color="green", label="Test score")
         plt.legend(loc="best")
         # Salvataggio del grafico
         plt.savefig(os.path.join(savePath, 'learningCurves', f"{model_name}.png"))

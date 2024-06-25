@@ -66,7 +66,6 @@ class optimizationCsp:
         cost_context = self.cost(context, can_eval)
 
         if cost_context + self.h(rem_Cs) < self.bound:
-            print(f"Cost: {cost_context}\tBound: {self.bound}")
             if not CVs:
                 self.best_asst = context
                 self.bound = cost_context

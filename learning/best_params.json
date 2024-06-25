@@ -1,1 +1,23 @@
-{"Decision Tree": {"criterion": "entropy", "max_depth": 40, "min_samples_leaf": 1, "min_samples_split": 2}, "Random Forest": {"bootstrap": false, "criterion": "entropy", "max_depth": 20, "min_samples_leaf": 1, "min_samples_split": 2, "n_estimators": 100}, "Logistic Regression": {"C": 0.1, "max_iter": 500, "penalty": "l2", "solver": "liblinear"}, "K-Nearest Neighbors": {"algorithm": "ball_tree", "n_neighbors": 3, "weights": "distance"}}
+{
+    "Decision Tree": {
+        "criterion": "gini", 
+        "max_depth": 40, 
+        "min_samples_leaf": 1, 
+        "min_samples_split": 2
+    },
+
+    "Random Forest": {
+        "bootstrap": false, 
+        "criterion": "entropy", 
+        "max_depth": 20, 
+        "min_samples_leaf": 1, 
+        "min_samples_split": 5, 
+        "n_estimators": 200
+    }, 
+    
+    "AdaBoost": {
+        "algorithm": "SAMME", 
+        "learning_rate": 1, 
+        "n_estimators": 200
+    }
+}

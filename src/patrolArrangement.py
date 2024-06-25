@@ -45,7 +45,7 @@ class PatrolArrangement:
     def cost(self, context, Cs):
         """
         Metodo che calcola il costo del contesto specificato in base ai vincoli che possono essere valutati.
-        Se un vincolo non è soddisfatto, il costo del contesto è maggiore del bound.
+        Se un vincolo non è soddisfatto, il costo del contesto è pari a infinito.
         Il costo è dato dal numero di pattuglie assegnate dove ogni pattuglia ha un peso diverso in base alla gravità dell'area
 
         Parametri:
